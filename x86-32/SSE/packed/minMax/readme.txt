@@ -1,0 +1,1 @@
+Calculates min and max using SSE instructions.
