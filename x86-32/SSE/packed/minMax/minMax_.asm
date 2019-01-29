@@ -6,7 +6,7 @@
 INT32_MIN dword 080000000h
 INT32_MAX dword 07fffffffh
 PTR_ALIGNMENT dword 00000000Fh
-SIZE_ALIGNMENT dword 000000003h
+SIZE_ALIGNMENT dword 000000007h
 
 align 16
 INT32_MIN_PACKED dword 080000000h,080000000h,080000000h,080000000h
@@ -27,28 +27,41 @@ FindMinMax_SSE proc
     jnz BAD_INPUT
 
     mov edx, [ebp+12]               ; edx = arraySize
-    test edx, SIZE_ALIGNMENT        ; check is size is multiple of 4
+    test edx, SIZE_ALIGNMENT        ; check is size is multiple of 8
     jnz BAD_INPUT
 
-    shr edx,2                       ; edx = arraySize/4, counts number of packed iterations
+    shr edx,3                       ; edx = arraySize/8, counts number of packed iterations
 
-    movdqa xmm0, xmmword ptr [INT32_MAX_PACKED]	; xmm0 = running min values.
-    movdqa xmm1, xmmword ptr [INT32_MIN_PACKED]	; xmm1 = running max values.
+    movdqa xmm0, xmmword ptr [INT32_MAX_PACKED]	; xmm0 = running min values 1.
+    movdqa xmm1, xmmword ptr [INT32_MIN_PACKED]	; xmm1 = running max values 1.
+
+    movdqa xmm4, xmmword ptr [INT32_MAX_PACKED]	; xmm4 = running min values 2.
+    movdqa xmm5, xmmword ptr [INT32_MIN_PACKED]	; xmm5 = running max values 2.
 
 MAIN_LOOP:
     movdqa xmm2, xmmword ptr[ecx]   ; xmm2 = ontains next packed values
+    movdqa xmm6, xmmword ptr[ecx+16]; xmm6 = ontains next packed values
+
     movdqa xmm3, xmm2
+    movdqa xmm7, xmm6
 
-    pminsd xmm0, xmm2               ; select min values
-    pmaxsd xmm1, xmm3               ; select max values
+    pminsd xmm0, xmm2               ; select min values 1
+    pmaxsd xmm1, xmm3               ; select max values 1
 
-    add ecx, 16                     ; update array ptr
+    pminsd xmm4, xmm6               ; select min values 2
+    pmaxsd xmm5, xmm7               ; select max values 2
+
+    add ecx, 32                     ; update array ptr
     dec edx                         ; continue loop if there is more data to process.
     jnz MAIN_LOOP
 
     ; MAIN_LOOP IS DONE, now calculate final min and max:
 
-    ; Calc final min:
+    ; Merge two running mins and maxes:
+    pmaxsd xmm1, xmm5
+
+    ; Calc final min: 
+
     movdqa xmm2, xmm0
     pshufd xmm2, xmm2, 00001110b    ; xmm2[0:63]=xmm[64:127]
     pminsd xmm0, xmm2               ; xmm0[0:63] constains two most min values
