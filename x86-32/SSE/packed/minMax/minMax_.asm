@@ -58,6 +58,7 @@ MAIN_LOOP:
     ; MAIN_LOOP IS DONE, now calculate final min and max:
 
     ; Merge two running mins and maxes:
+    pminsd xmm0, xmm4
     pmaxsd xmm1, xmm5
 
     ; Calc final min: 
